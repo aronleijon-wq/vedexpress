@@ -9,13 +9,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Räkna ut hur mycket ved du behöver för säsongen och beställ med hemkörning inom Stockholms län. Torr björkved, levererad direkt till din dörr.",
+          "Räkna ut hur mycket ved du behöver för säsongen, och hur länge den räcker i månader. Beställ med hemkörning inom Stockholms län. Torr björkved, levererad direkt till din dörr.",
       },
       { property: "og:title", content: "Vedlagret — Torr ved med hemkörning" },
       {
         property: "og:description",
         content:
-          "Räkna ut hur mycket ved du behöver för säsongen och beställ med hemkörning.",
+          "Räkna ut hur mycket ved du behöver för säsongen, och hur länge den räcker i månader. Hemkörning inom Stockholms län.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -33,12 +33,63 @@ function isDeliveryArea(address: string) {
   return (pnr >= 100 && pnr <= 199) || (pnr >= 761 && pnr <= 764);
 }
 
+// ---------------------------------------------------------------------------
+// Vedens egenskaper — torr björkved sågad i 20 cm längder
+// ---------------------------------------------------------------------------
+const LOG_LENGTH_M = 0.2; // längd på en vedkloss (m)
+const LOG_DIAMETER_M = 0.09; // diameter på en vedkloss (m)
+const STACK_FACTOR = 0.7; // andel av en uppmätt kubik som är ren ved (resten luft)
+const BIRCH_DENSITY_KG_M3 = 730; // kg ren volym björkved vid ca 20 % fukt
+const ENERGY_PER_KG = 4.2; // kWh per kg björkved vid ca 20 % fukt
+
+// ---------------------------------------------------------------------------
+// Eldandet — standardvärden som går att justera på sidan
+// ---------------------------------------------------------------------------
+const DEFAULT_FIRINGS_PER_WEEK = 6; // eldningar per vecka
+const DEFAULT_BLOCKS_PER_FIRING = 20; // vedklossar per eldning
+
+const DAYS_PER_WEEK = 7;
+const WEEKS_PER_YEAR = 52;
+const MONTHS_PER_YEAR = 12;
+const SEASON_MONTHS = 8; // säsongen i Stockholms län, ca oktober–maj
+const SEASON_WEEKS = SEASON_MONTHS * (WEEKS_PER_YEAR / MONTHS_PER_YEAR); // 34,7 v
+
+// Ekvation 1: volymen av en enda kloss (cylinder) = pi * r^2 * langd
+const LOG_SOLID_M3 =
+  Math.PI * Math.pow(LOG_DIAMETER_M / 2, 2) * LOG_LENGTH_M; // 0,00127 m3
+
+// Ekvation 2: klossar per uppmatt kubik = 1 / (ren volym / staplingsfaktor)
+const BLOCKS_PER_M3 = Math.round(1 / (LOG_SOLID_M3 / STACK_FACTOR)); // ca 550 st
+
+// Ekvation 3: vikt per uppmatt kubik = staplingsfaktor * treetthet
+const KG_PER_M3 = Math.round(STACK_FACTOR * BIRCH_DENSITY_KG_M3); // ca 511 kg
+
+// Ekvation 4: vikt per kloss = kg per kubik / klossar per kubik
+const KG_PER_BLOCK = KG_PER_M3 / BLOCKS_PER_M3; // ca 0,93 kg
+
+// Ekvation 5: energi per kloss = vikt per kloss * kWh per kg
+const KWH_PER_BLOCK = KG_PER_BLOCK * ENERGY_PER_KG; // ca 3,9 kWh
+
+// Ekvation 6: energi per kubik = kg per kubik * kWh per kg
+const KWH_PER_M3 = KG_PER_M3 * ENERGY_PER_KG; // ca 2 146 kWh
+
+function num(value: number, decimals = 0) {
+  return value.toLocaleString("sv-SE", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
 function Index() {
   const [mode, setMode] = useState<"stoves" | "house">("house");
   const [stoves, setStoves] = useState(1);
   const [area, setArea] = useState(120);
   const [ordered, setOrdered] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
+  const [firingsPerWeek, setFiringsPerWeek] = useState(DEFAULT_FIRINGS_PER_WEEK);
+  const [blocksPerFiring, setBlocksPerFiring] = useState(
+    DEFAULT_BLOCKS_PER_FIRING,
+  );
 
   const volume = useMemo(() => {
     const v = mode === "stoves" ? stoves * 3 : area * 0.05;
@@ -46,6 +97,28 @@ function Index() {
   }, [mode, stoves, area]);
 
   const price = Math.round(volume * PRICE_PER_M3);
+
+  // Ekvation 7-10: hur mycket du eldar bort per tidseinhet
+  const blocksPerWeek = firingsPerWeek * blocksPerFiring; // 120 klossar/v
+  const blocksPerDay = blocksPerWeek / DAYS_PER_WEEK; // 17,1 klossar/d
+  const blocksPerMonth =
+    blocksPerWeek * (WEEKS_PER_YEAR / MONTHS_PER_YEAR); // 520 klossar/man
+  const kwhPerFiring = blocksPerFiring * KWH_PER_BLOCK; // 78 kWh/eldning
+  const kwhPerMonth = blocksPerMonth * KWH_PER_BLOCK; // 2 028 kWh/man
+
+  // Ekvation 11: antal klossar i din leverans
+  const totalBlocks = volume * BLOCKS_PER_M3; // 3 300 klossar
+
+  // Ekvation 12-14: racktiden
+  const days = totalBlocks / blocksPerDay; // 192 dagar
+  const weeks = totalBlocks / blocksPerWeek; // 27,5 v
+  const months = totalBlocks / blocksPerMonth; // 6,3 man
+
+  // Ekvation 15: eldningar per vecka som racker hela säsongen
+  const firingsForSeason = totalBlocks / (SEASON_WEEKS * blocksPerFiring);
+
+  const seasonShare = Math.min(1, months / SEASON_MONTHS);
+  const costPerMonth = price / months;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -90,6 +163,7 @@ function Index() {
           {/* Mode toggle */}
           <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl bg-muted p-1">
             <button
+              type="button"
               onClick={() => setMode("house")}
               className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                 mode === "house"
@@ -100,6 +174,7 @@ function Index() {
               Husets storlek
             </button>
             <button
+              type="button"
               onClick={() => setMode("stoves")}
               className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                 mode === "stoves"
@@ -156,6 +231,72 @@ function Index() {
             )}
           </div>
 
+          {/* Eldningsvanor */}
+          <div className="mt-8">
+            <p className="text-sm font-medium">Så ofta eldar du</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Justera efter hur du faktiskt använder kaminen.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+                <span className="text-sm text-muted-foreground">
+                  Eldningar i veckan
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    aria-label="Färre eldningar i veckan"
+                    onClick={() => setFiringsPerWeek((v) => Math.max(1, v - 1))}
+                    className="h-8 w-8 rounded-lg border border-border text-lg font-bold leading-none text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    −
+                  </button>
+                  <span className="w-8 text-center text-lg font-bold text-primary">
+                    {firingsPerWeek}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Fler eldningar i veckan"
+                    onClick={() => setFiringsPerWeek((v) => Math.min(7, v + 1))}
+                    className="h-8 w-8 rounded-lg border border-border text-lg font-bold leading-none text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
+                <span className="text-sm text-muted-foreground">
+                  Klossar per eldning
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    aria-label="Färre klossar per eldning"
+                    onClick={() =>
+                      setBlocksPerFiring((v) => Math.max(5, v - 5))
+                    }
+                    className="h-8 w-8 rounded-lg border border-border text-lg font-bold leading-none text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    −
+                  </button>
+                  <span className="w-10 text-center text-lg font-bold text-primary">
+                    {blocksPerFiring}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="Fler klossar per eldning"
+                    onClick={() =>
+                      setBlocksPerFiring((v) => Math.min(40, v + 5))
+                    }
+                    className="h-8 w-8 rounded-lg border border-border text-lg font-bold leading-none text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Result */}
           <div className="mt-8 rounded-xl bg-accent p-6 text-center">
             <p className="text-sm font-medium text-muted-foreground">
@@ -173,6 +314,158 @@ function Index() {
             </p>
           </div>
 
+          {/* How long it lasts */}
+          <div className="mt-4 rounded-xl border border-border p-6">
+            <p className="text-sm font-medium text-muted-foreground">
+              Hur länge räcker {volume.toLocaleString("sv-SE")} m³?
+            </p>
+            <p className="mt-1 text-5xl font-bold tracking-tight text-primary">
+              {num(months, 1)} månader
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {num(weeks, 1)} veckor · {num(days)} dagar · {num(totalBlocks)}{" "}
+              vedklossar
+            </p>
+
+            <div className="mt-5">
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${seasonShare * 100}%` }}
+                />
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {months >= SEASON_MONTHS ? (
+                  <>
+                    Räcker hela säsongen (oktober–maj) och{" "}
+                    {num(months - SEASON_MONTHS, 1)} månader utöver den.
+                  </>
+                ) : (
+                  <>
+                    Säsongen i Stockholms län är ca {SEASON_MONTHS} månader
+                    (oktober–maj). Vill du elda hela den behöver du elda i snitt{" "}
+                    <span className="font-semibold text-foreground">
+                      ca {Math.round(firingsForSeason)} gånger i veckan
+                    </span>{" "}
+                    — eller {num(blocksPerWeek)} klossar i veckan.
+                  </>
+                )}
+              </p>
+            </div>
+
+            <dl className="mt-6 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+              <div className="rounded-lg bg-muted px-4 py-3">
+                <dt className="text-xs text-muted-foreground">
+                  Klossar i veckan
+                </dt>
+                <dd className="mt-0.5 text-lg font-bold">
+                  {num(blocksPerWeek)}
+                </dd>
+              </div>
+              <div className="rounded-lg bg-muted px-4 py-3">
+                <dt className="text-xs text-muted-foreground">
+                  Klossar per månad
+                </dt>
+                <dd className="mt-0.5 text-lg font-bold">
+                  {num(blocksPerMonth)}
+                </dd>
+              </div>
+              <div className="rounded-lg bg-muted px-4 py-3">
+                <dt className="text-xs text-muted-foreground">
+                  Värme per månad
+                </dt>
+                <dd className="mt-0.5 text-lg font-bold">
+                  {num(kwhPerMonth)} kWh
+                </dd>
+              </div>
+              <div className="rounded-lg bg-muted px-4 py-3">
+                <dt className="text-xs text-muted-foreground">
+                  Kostnad per månad
+                </dt>
+                <dd className="mt-0.5 text-lg font-bold">
+                  {num(costPerMonth)} kr
+                </dd>
+              </div>
+              <div className="rounded-lg bg-muted px-4 py-3">
+                <dt className="text-xs text-muted-foreground">
+                  Energi per kloss
+                </dt>
+                <dd className="mt-0.5 text-lg font-bold">
+                  {num(KWH_PER_BLOCK, 1)} kWh
+                </dd>
+              </div>
+              <div className="rounded-lg bg-muted px-4 py-3">
+                <dt className="text-xs text-muted-foreground">
+                  Värme per eldning
+                </dt>
+                <dd className="mt-0.5 text-lg font-bold">
+                  {num(kwhPerFiring)} kWh
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          {/* So the customer can follow the maths */}
+          <details className="mt-4 rounded-xl border border-border px-5 py-4">
+            <summary className="cursor-pointer text-sm font-semibold">
+              Så har vi räknat
+            </summary>
+            <ol className="mt-4 space-y-3 text-sm text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">
+                  1. Volym per kloss
+                </span>{" "}
+                = π × ({num(LOG_DIAMETER_M * 100)} cm ÷ 2)² ×{" "}
+                {num(LOG_LENGTH_M * 100)} cm = {num(LOG_SOLID_M3 * 1000, 2)}{" "}
+                liter ren ved
+              </li>
+              <li>
+                <span className="font-medium text-foreground">
+                  2. Klossar per kubik
+                </span>{" "}
+                = 1 000 liter ÷ ({num(LOG_SOLID_M3 * 1000, 2)} liter ÷{" "}
+                {num(STACK_FACTOR * 100)} % stapling) = {num(BLOCKS_PER_M3)}{" "}
+                klossar per m³
+              </li>
+              <li>
+                <span className="font-medium text-foreground">
+                  3. Vikt per kloss
+                </span>{" "}
+                = ({num(STACK_FACTOR * 100)} % × {num(BIRCH_DENSITY_KG_M3)}{" "}
+                kg/m³) ÷ {num(BLOCKS_PER_M3)} = {num(KG_PER_BLOCK, 2)} kg
+              </li>
+              <li>
+                <span className="font-medium text-foreground">
+                  4. Energi per kloss
+                </span>{" "}
+                = {num(KG_PER_BLOCK, 2)} kg × {num(ENERGY_PER_KG, 1)} kWh/kg ={" "}
+                {num(KWH_PER_BLOCK, 1)} kWh — det ger {num(KWH_PER_M3)} kWh per
+                m³ björkved
+              </li>
+              <li>
+                <span className="font-medium text-foreground">5. Åtgång</span> ={" "}
+                {firingsPerWeek} eldningar × {blocksPerFiring} klossar ={" "}
+                {num(blocksPerWeek)} klossar/vecka × {num(52 / 12, 2)} ={" "}
+                {num(blocksPerMonth)} klossar/månad
+              </li>
+              <li>
+                <span className="font-medium text-foreground">
+                  6. Räcktid
+                </span>{" "}
+                = {num(totalBlocks)} klossar ÷ {num(blocksPerWeek)} ={" "}
+                {num(weeks, 1)} veckor × {num(12 / 52, 3)} ={" "}
+                <span className="font-semibold text-foreground">
+                  {num(months, 1)} månader
+                </span>
+              </li>
+            </ol>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Torr björkved, {num(LOG_LENGTH_M * 100)} cm längder. Uppmätt kubik
+              innehåller ca {num(KG_PER_M3)} kg ved ({num(BLOCKS_PER_M3)}{" "}
+              klossar) och ger ca {num(KWH_PER_M3)} kWh värme.
+            </p>
+          </details>
+
           <a
             href="#kop"
             className="mt-6 block w-full rounded-xl bg-primary px-6 py-4 text-center text-lg font-bold text-primary-foreground transition-opacity hover:opacity-90"
@@ -182,13 +475,18 @@ function Index() {
         </section>
 
         {/* Order */}
-        <section id="kop" className="mt-12 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <section
+          id="kop"
+          className="mt-12 rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"
+        >
           {ordered ? (
             <div className="py-8 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent">
                 <Check className="h-7 w-7 text-primary" />
               </div>
-              <h2 className="mt-4 text-2xl font-bold">Tack för din beställning!</h2>
+              <h2 className="mt-4 text-2xl font-bold">
+                Tack för din beställning!
+              </h2>
               <p className="mx-auto mt-2 max-w-md text-muted-foreground">
                 Vi hör av oss inom kort för att boka en leveranstid som passar
                 dig. Din ved är på väg!
@@ -198,8 +496,8 @@ function Index() {
             <>
               <h2 className="text-2xl font-bold">Beställ din ved</h2>
               <p className="mt-1 text-muted-foreground">
-                Fyll i dina uppgifter — vi ringer upp och bokar leverans.
-                Vi kör hem inom Stockholms län.
+                Fyll i dina uppgifter — vi ringer upp och bokar leverans. Vi kör
+                hem inom Stockholms län.
               </p>
               <form
                 className="mt-6 space-y-4"
@@ -244,7 +542,10 @@ function Index() {
                   />
                 </div>
                 <div>
-                  <label htmlFor="address" className="block text-sm font-medium">
+                  <label
+                    htmlFor="address"
+                    className="block text-sm font-medium"
+                  >
                     Leveransadress
                   </label>
                   <input
@@ -272,7 +573,8 @@ function Index() {
                   <span className="font-medium">Din beställning:</span>{" "}
                   {volume.toLocaleString("sv-SE")} m³ björkved —{" "}
                   {price.toLocaleString("sv-SE")} kr inkl. hemkörning inom
-                  Stockholms län
+                  Stockholms län. Räcker ca {num(months, 1)} månader vid{" "}
+                  {firingsPerWeek} eldningar i veckan.
                 </div>
                 <button
                   type="submit"
