@@ -5,13 +5,13 @@ import { Flame, Truck, TreePine, Check, MapPin } from "lucide-react";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Vedlagret — Torr ved med hemkörning" },
+      { title: "VedExpress — Torr ved med hemkörning" },
       {
         name: "description",
         content:
           "Räkna ut hur mycket ved du behöver för säsongen, och hur länge den räcker i månader. Beställ med hemkörning inom Stockholms län. Torr björkved, levererad direkt till din dörr.",
       },
-      { property: "og:title", content: "Vedlagret — Torr ved med hemkörning" },
+      { property: "og:title", content: "VedExpress — Torr ved med hemkörning" },
       {
         property: "og:description",
         content:
@@ -126,7 +126,7 @@ function Index() {
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-4">
           <Flame className="h-6 w-6 text-primary" />
-          <span className="text-lg font-bold tracking-tight">Vedlagret</span>
+          <span className="text-lg font-bold tracking-tight">VedExpress</span>
         </div>
       </header>
 
@@ -591,7 +591,7 @@ function Index() {
       <footer className="border-t border-border bg-card">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-6 text-sm text-muted-foreground">
           <span className="flex items-center gap-2">
-            <Flame className="h-4 w-4 text-primary" /> Vedlagret
+            <Flame className="h-4 w-4 text-primary" /> VedExpress
           </span>
           <span>Torr ved · Hemkörning i Stockholms län</span>
         </div>
