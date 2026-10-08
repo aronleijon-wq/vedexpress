@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Flame, Truck, TreePine, Check, MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -85,6 +86,8 @@ function Index() {
   const [stoves, setStoves] = useState(1);
   const [area, setArea] = useState(120);
   const [ordered, setOrdered] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [firingsPerWeek, setFiringsPerWeek] = useState(DEFAULT_FIRINGS_PER_WEEK);
   const [blocksPerFiring, setBlocksPerFiring] = useState(
