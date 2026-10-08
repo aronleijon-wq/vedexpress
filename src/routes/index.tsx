@@ -504,11 +504,10 @@ function Index() {
               </p>
               <form
                 className="mt-6 space-y-4"
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
-                  const address = String(
-                    new FormData(e.currentTarget).get("address") ?? "",
-                  );
+                  const data = new FormData(e.currentTarget);
+                  const address = String(data.get("address") ?? "");
                   if (!isDeliveryArea(address)) {
                     setAddressError(
                       "Vi levererar inom Stockholms län — kontrollera postnumret i adressen.",
@@ -516,6 +515,25 @@ function Index() {
                     return;
                   }
                   setAddressError(null);
+                  setSubmitting(true);
+                  setOrderError(null);
+                  const { error } = await supabase.from("orders").insert({
+                    name: String(data.get("name") ?? "").trim(),
+                    phone: String(data.get("phone") ?? "").trim(),
+                    address,
+                    volume_m3: volume,
+                    price_kr: price,
+                    firings_per_week: firingsPerWeek,
+                    blocks_per_firing: blocksPerFiring,
+                    months: Math.round(months * 10) / 10,
+                  });
+                  setSubmitting(false);
+                  if (error) {
+                    setOrderError(
+                      "Något gick fel när beställningen skickades. Försök igen eller ring oss.",
+                    );
+                    return;
+                  }
                   setOrdered(true);
                 }}
               >
@@ -525,6 +543,7 @@ function Index() {
                   </label>
                   <input
                     id="name"
+                    name="name"
                     required
                     maxLength={100}
                     className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -537,6 +556,7 @@ function Index() {
                   </label>
                   <input
                     id="phone"
+                    name="phone"
                     type="tel"
                     required
                     maxLength={20}
