@@ -599,11 +599,17 @@ function Index() {
                   Stockholms län. Räcker ca {num(months, 1)} månader vid{" "}
                   {firingsPerWeek} eldningar i veckan.
                 </div>
+                {orderError && (
+                  <p className="text-sm font-medium text-destructive">
+                    {orderError}
+                  </p>
+                )}
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-primary px-6 py-4 text-lg font-bold text-primary-foreground transition-opacity hover:opacity-90"
+                  disabled={submitting}
+                  className="w-full rounded-xl bg-primary px-6 py-4 text-lg font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  Skicka beställning
+                  {submitting ? "Skickar…" : "Skicka beställning"}
                 </button>
               </form>
             </>
