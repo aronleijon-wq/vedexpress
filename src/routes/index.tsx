@@ -26,6 +26,13 @@ export const Route = createFileRoute("/")({
 
 const PRICE_PER_M3 = 1295;
 
+// Leverans sker endast inom Stockholms län: postnummer 1xx xx samt 761–764 xx.
+function isDeliveryArea(address: string) {
+  const postal = address.match(/(\d{3})\s?\d{2}/);
+  const pnr = postal ? Number(postal[1]) : NaN;
+  return (pnr >= 100 && pnr <= 199) || (pnr >= 761 && pnr <= 764);
+}
+
 function Index() {
   const [mode, setMode] = useState<"stoves" | "house">("house");
   const [stoves, setStoves] = useState(1);
@@ -198,12 +205,10 @@ function Index() {
                 className="mt-6 space-y-4"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  const address = new FormData(e.currentTarget).get("address");
-                  const postal = String(address ?? "").match(/(\d{3})\s?\d{2}/);
-                  const pnr = postal ? Number(postal[1]) : NaN;
-                  const iLanet =
-                    (pnr >= 100 && pnr <= 199) || (pnr >= 761 && pnr <= 764);
-                  if (!iLanet) {
+                  const address = String(
+                    new FormData(e.currentTarget).get("address") ?? "",
+                  );
+                  if (!isDeliveryArea(address)) {
                     setAddressError(
                       "Vi levererar inom Stockholms län — kontrollera postnumret i adressen.",
                     );
