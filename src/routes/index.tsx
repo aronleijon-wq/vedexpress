@@ -599,5 +599,3 @@ function Index() {
     </div>
   );
 }
-</content>
-</invoke>
