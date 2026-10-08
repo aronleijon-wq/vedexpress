@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Flame, Truck, TreePine, Check, MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -85,6 +86,8 @@ function Index() {
   const [stoves, setStoves] = useState(1);
   const [area, setArea] = useState(120);
   const [ordered, setOrdered] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [firingsPerWeek, setFiringsPerWeek] = useState(DEFAULT_FIRINGS_PER_WEEK);
   const [blocksPerFiring, setBlocksPerFiring] = useState(
@@ -501,11 +504,10 @@ function Index() {
               </p>
               <form
                 className="mt-6 space-y-4"
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
-                  const address = String(
-                    new FormData(e.currentTarget).get("address") ?? "",
-                  );
+                  const data = new FormData(e.currentTarget);
+                  const address = String(data.get("address") ?? "");
                   if (!isDeliveryArea(address)) {
                     setAddressError(
                       "Vi levererar inom Stockholms län — kontrollera postnumret i adressen.",
@@ -513,6 +515,25 @@ function Index() {
                     return;
                   }
                   setAddressError(null);
+                  setSubmitting(true);
+                  setOrderError(null);
+                  const { error } = await supabase.from("orders").insert({
+                    name: String(data.get("name") ?? "").trim(),
+                    phone: String(data.get("phone") ?? "").trim(),
+                    address,
+                    volume_m3: volume,
+                    price_kr: price,
+                    firings_per_week: firingsPerWeek,
+                    blocks_per_firing: blocksPerFiring,
+                    months: Math.round(months * 10) / 10,
+                  });
+                  setSubmitting(false);
+                  if (error) {
+                    setOrderError(
+                      "Något gick fel när beställningen skickades. Försök igen eller ring oss.",
+                    );
+                    return;
+                  }
                   setOrdered(true);
                 }}
               >
@@ -522,6 +543,7 @@ function Index() {
                   </label>
                   <input
                     id="name"
+                    name="name"
                     required
                     maxLength={100}
                     className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
@@ -534,6 +556,7 @@ function Index() {
                   </label>
                   <input
                     id="phone"
+                    name="phone"
                     type="tel"
                     required
                     maxLength={20}
@@ -576,11 +599,17 @@ function Index() {
                   Stockholms län. Räcker ca {num(months, 1)} månader vid{" "}
                   {firingsPerWeek} eldningar i veckan.
                 </div>
+                {orderError && (
+                  <p className="text-sm font-medium text-destructive">
+                    {orderError}
+                  </p>
+                )}
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-primary px-6 py-4 text-lg font-bold text-primary-foreground transition-opacity hover:opacity-90"
+                  disabled={submitting}
+                  className="w-full rounded-xl bg-primary px-6 py-4 text-lg font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
-                  Skicka beställning
+                  {submitting ? "Skickar…" : "Skicka beställning"}
                 </button>
               </form>
             </>
