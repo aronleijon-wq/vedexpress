@@ -14,7 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      orders: {
+        Row: {
+          address: string
+          blocks_per_firing: number
+          created_at: string
+          firings_per_week: number
+          id: string
+          months: number
+          name: string
+          phone: string
+          price_kr: number
+          volume_m3: number
+        }
+        Insert: {
+          address: string
+          blocks_per_firing: number
+          created_at?: string
+          firings_per_week: number
+          id?: string
+          months: number
+          name: string
+          phone: string
+          price_kr: number
+          volume_m3: number
+        }
+        Update: {
+          address?: string
+          blocks_per_firing?: number
+          created_at?: string
+          firings_per_week?: number
+          id?: string
+          months?: number
+          name?: string
+          phone?: string
+          price_kr?: number
+          volume_m3?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
