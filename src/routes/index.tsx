@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Flame, Truck, TreePine, Check } from "lucide-react";
+import { Flame, Truck, TreePine, Check, MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -31,6 +31,7 @@ function Index() {
   const [stoves, setStoves] = useState(1);
   const [area, setArea] = useState(120);
   const [ordered, setOrdered] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
 
   const volume = useMemo(() => {
     const v = mode === "stoves" ? stoves * 3 : area * 0.05;
@@ -65,6 +66,9 @@ function Index() {
             </span>
             <span className="flex items-center gap-2">
               <Truck className="h-4 w-4 text-primary" /> Hemkörning ingår
+            </span>
+            <span className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" /> Endast Stockholms län
             </span>
           </div>
         </section>
@@ -158,6 +162,7 @@ function Index() {
             </p>
             <p className="text-sm text-muted-foreground">
               {PRICE_PER_M3.toLocaleString("sv-SE")} kr/m³ — hemkörning ingår
+              inom Stockholms län
             </p>
           </div>
 
@@ -187,11 +192,24 @@ function Index() {
               <h2 className="text-2xl font-bold">Beställ din ved</h2>
               <p className="mt-1 text-muted-foreground">
                 Fyll i dina uppgifter — vi ringer upp och bokar leverans.
+                Vi kör hem inom Stockholms län.
               </p>
               <form
                 className="mt-6 space-y-4"
                 onSubmit={(e) => {
                   e.preventDefault();
+                  const address = new FormData(e.currentTarget).get("address");
+                  const postal = String(address ?? "").match(/(\d{3})\s?\d{2}/);
+                  const pnr = postal ? Number(postal[1]) : NaN;
+                  const iLanet =
+                    (pnr >= 100 && pnr <= 199) || (pnr >= 761 && pnr <= 764);
+                  if (!iLanet) {
+                    setAddressError(
+                      "Vi levererar inom Stockholms län — kontrollera postnumret i adressen.",
+                    );
+                    return;
+                  }
+                  setAddressError(null);
                   setOrdered(true);
                 }}
               >
@@ -226,16 +244,30 @@ function Index() {
                   </label>
                   <input
                     id="address"
+                    name="address"
                     required
                     maxLength={200}
-                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    aria-invalid={addressError ? true : undefined}
+                    onChange={() => addressError && setAddressError(null)}
+                    className={`mt-1 w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring ${
+                      addressError ? "border-destructive" : "border-input"
+                    }`}
                     placeholder="Gatuadress, postnummer och ort"
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Hemkörning ingår — leverans inom Stockholms län.
+                  </p>
+                  {addressError && (
+                    <p className="mt-1 text-sm font-medium text-destructive">
+                      {addressError}
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-lg bg-muted px-4 py-3 text-sm">
                   <span className="font-medium">Din beställning:</span>{" "}
                   {volume.toLocaleString("sv-SE")} m³ björkved —{" "}
-                  {price.toLocaleString("sv-SE")} kr inkl. hemkörning
+                  {price.toLocaleString("sv-SE")} kr inkl. hemkörning inom
+                  Stockholms län
                 </div>
                 <button
                   type="submit"
@@ -254,7 +286,7 @@ function Index() {
           <span className="flex items-center gap-2">
             <Flame className="h-4 w-4 text-primary" /> Vedlagret
           </span>
-          <span>Torr ved · Hemkörning · Alltid rätt mängd</span>
+          <span>Torr ved · Hemkörning i Stockholms län</span>
         </div>
       </footer>
     </div>
