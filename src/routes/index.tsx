@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Räkna ut hur mycket ved du behöver för säsongen och beställ med hemkörning. Torr björkved, levererad direkt till din dörr.",
+          "Räkna ut hur mycket ved du behöver för säsongen och beställ med hemkörning inom Stockholms län. Torr björkved, levererad direkt till din dörr.",
       },
       { property: "og:title", content: "Vedlagret — Torr ved med hemkörning" },
       {
