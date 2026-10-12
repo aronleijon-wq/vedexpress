@@ -19,36 +19,42 @@ export type Database = {
           address: string
           blocks_per_firing: number
           created_at: string
+          delivery_interval_weeks: number | null
           firings_per_week: number
           id: string
           months: number
           name: string
           phone: string
           price_kr: number
+          sacks_per_delivery: number | null
           volume_m3: number
         }
         Insert: {
           address: string
           blocks_per_firing: number
           created_at?: string
+          delivery_interval_weeks?: number | null
           firings_per_week: number
           id?: string
           months: number
           name: string
           phone: string
           price_kr: number
+          sacks_per_delivery?: number | null
           volume_m3: number
         }
         Update: {
           address?: string
           blocks_per_firing?: number
           created_at?: string
+          delivery_interval_weeks?: number | null
           firings_per_week?: number
           id?: string
           months?: number
           name?: string
           phone?: string
           price_kr?: number
+          sacks_per_delivery?: number | null
           volume_m3?: number
         }
         Relationships: []

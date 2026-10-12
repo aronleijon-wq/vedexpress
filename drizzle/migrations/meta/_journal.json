@@ -8,6 +8,13 @@
       "when": 1791489814707,
       "tag": "0000_create_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791820874510,
+      "tag": "0001_add_recurring_delivery",
+      "breakpoints": true
     }
   ]
 }
