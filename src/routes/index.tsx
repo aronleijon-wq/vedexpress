@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { DELIVERY_AREA, isDeliveryArea } from "@/lib/delivery-area";
 import { Flame, Truck, TreePine, Check, MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -10,13 +11,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Räkna ut hur mycket ved du behöver för säsongen, och hur länge den räcker i månader. Beställ med hemkörning inom Stockholms län. Torr björkved, levererad direkt till din dörr.",
+          `Räkna ut hur mycket ved du behöver för säsongen, och hur länge den räcker i månader. Beställ med hemkörning inom ${DELIVERY_AREA.name}. Torr björkved, levererad direkt till din dörr.`,
       },
       { property: "og:title", content: "VedExpress — Torr ved med hemkörning" },
       {
         property: "og:description",
         content:
-          "Räkna ut hur mycket ved du behöver för säsongen, och hur länge den räcker i månader. Hemkörning inom Stockholms län.",
+          `Räkna ut hur mycket ved du behöver för säsongen, och hur länge den räcker i månader. Hemkörning inom ${DELIVERY_AREA.name}.`,
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -27,20 +28,13 @@ export const Route = createFileRoute("/")({
 
 const PRICE_PER_M3 = 1295;
 
-// Leverans sker endast inom Stockholms län: postnummer 1xx xx samt 761–764 xx.
-function isDeliveryArea(address: string) {
-  const postal = address.match(/(\d{3})\s?\d{2}/);
-  const pnr = postal ? Number(postal[1]) : NaN;
-  return (pnr >= 100 && pnr <= 199) || (pnr >= 761 && pnr <= 764);
-}
-
 // ---------------------------------------------------------------------------
 // Vedens egenskaper — torr björkved sågad i 20 cm längder
 // ---------------------------------------------------------------------------
 const LOG_LENGTH_M = 0.2; // längd på en vedkloss (m)
 const LOG_DIAMETER_M = 0.09; // diameter på en vedkloss (m)
 const STACK_FACTOR = 0.7; // andel av en uppmätt kubik som är ren ved (resten luft)
-const BIRCH_DENSITY_KG_M3 = 730; // kg ren volym björkved vid ca 20 % fukt
+const BIRCH_DENSITY_KG_M3 = 670; // kg per m³ fast björkved vid ca 20 % fukt (≈ 2 800 kWh/m³ fast)
 const ENERGY_PER_KG = 4.2; // kWh per kg björkved vid ca 20 % fukt
 
 // ---------------------------------------------------------------------------
@@ -52,7 +46,7 @@ const DEFAULT_BLOCKS_PER_FIRING = 20; // vedklossar per eldning
 const DAYS_PER_WEEK = 7;
 const WEEKS_PER_YEAR = 52;
 const MONTHS_PER_YEAR = 12;
-const SEASON_MONTHS = 8; // säsongen i Stockholms län, ca oktober–maj
+const SEASON_MONTHS = 8; // eldningssäsongen, ca oktober–maj
 const SEASON_WEEKS = SEASON_MONTHS * (WEEKS_PER_YEAR / MONTHS_PER_YEAR); // 34,7 v
 
 // Ekvation 1: volymen av en enda kloss (cylinder) = pi * r^2 * langd
@@ -63,16 +57,16 @@ const LOG_SOLID_M3 =
 const BLOCKS_PER_M3 = Math.round(1 / (LOG_SOLID_M3 / STACK_FACTOR)); // ca 550 st
 
 // Ekvation 3: vikt per uppmatt kubik = staplingsfaktor * treetthet
-const KG_PER_M3 = Math.round(STACK_FACTOR * BIRCH_DENSITY_KG_M3); // ca 511 kg
+const KG_PER_M3 = Math.round(STACK_FACTOR * BIRCH_DENSITY_KG_M3); // ca 469 kg
 
 // Ekvation 4: vikt per kloss = kg per kubik / klossar per kubik
-const KG_PER_BLOCK = KG_PER_M3 / BLOCKS_PER_M3; // ca 0,93 kg
+const KG_PER_BLOCK = KG_PER_M3 / BLOCKS_PER_M3; // ca 0,85 kg
 
 // Ekvation 5: energi per kloss = vikt per kloss * kWh per kg
-const KWH_PER_BLOCK = KG_PER_BLOCK * ENERGY_PER_KG; // ca 3,9 kWh
+const KWH_PER_BLOCK = KG_PER_BLOCK * ENERGY_PER_KG; // ca 3,6 kWh
 
 // Ekvation 6: energi per kubik = kg per kubik * kWh per kg
-const KWH_PER_M3 = KG_PER_M3 * ENERGY_PER_KG; // ca 2 146 kWh
+const KWH_PER_M3 = KG_PER_M3 * ENERGY_PER_KG; // ca 1 970 kWh
 
 function num(value: number, decimals = 0) {
   return value.toLocaleString("sv-SE", {
@@ -101,13 +95,11 @@ function Index() {
 
   const price = Math.round(volume * PRICE_PER_M3);
 
-  // Ekvation 7-10: hur mycket du eldar bort per tidseinhet
+  // Ekvation 7-9: hur mycket du eldar bort per tidsenhet
   const blocksPerWeek = firingsPerWeek * blocksPerFiring; // 120 klossar/v
   const blocksPerDay = blocksPerWeek / DAYS_PER_WEEK; // 17,1 klossar/d
   const blocksPerMonth =
     blocksPerWeek * (WEEKS_PER_YEAR / MONTHS_PER_YEAR); // 520 klossar/man
-  const kwhPerFiring = blocksPerFiring * KWH_PER_BLOCK; // 78 kWh/eldning
-  const kwhPerMonth = blocksPerMonth * KWH_PER_BLOCK; // 2 028 kWh/man
 
   // Ekvation 11: antal klossar i din leverans
   const totalBlocks = volume * BLOCKS_PER_M3; // 3 300 klossar
@@ -117,11 +109,12 @@ function Index() {
   const weeks = totalBlocks / blocksPerWeek; // 27,5 v
   const months = totalBlocks / blocksPerMonth; // 6,3 man
 
-  // Ekvation 15: eldningar per vecka som racker hela säsongen
-  const firingsForSeason = totalBlocks / (SEASON_WEEKS * blocksPerFiring);
+  // Ekvation 15: klossar och eldningar per vecka som räcker hela säsongen
+  // (avrundat nedåt, så att veden säkert räcker)
+  const blocksPerWeekForSeason = Math.floor(totalBlocks / SEASON_WEEKS); // 95 klossar/v
+  const firingsForSeason = Math.floor(blocksPerWeekForSeason / blocksPerFiring); // 4 eldningar/v
 
   const seasonShare = Math.min(1, months / SEASON_MONTHS);
-  const costPerMonth = price / months;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -151,7 +144,7 @@ function Index() {
               <Truck className="h-4 w-4 text-primary" /> Hemkörning ingår
             </span>
             <span className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-primary" /> Endast Stockholms län
+              <MapPin className="h-4 w-4 text-primary" /> Endast {DELIVERY_AREA.name}
             </span>
           </div>
         </section>
@@ -313,7 +306,7 @@ function Index() {
             </p>
             <p className="text-sm text-muted-foreground">
               {PRICE_PER_M3.toLocaleString("sv-SE")} kr/m³ — hemkörning ingår
-              inom Stockholms län
+              inom {DELIVERY_AREA.name}
             </p>
           </div>
 
@@ -345,67 +338,24 @@ function Index() {
                   </>
                 ) : (
                   <>
-                    Säsongen i Stockholms län är ca {SEASON_MONTHS} månader
-                    (oktober–maj). Vill du elda hela den behöver du elda i snitt{" "}
+                    Säsongen i {DELIVERY_AREA.name} är ca {SEASON_MONTHS} månader
+                    (oktober–maj). Ska veden räcka hela säsongen kan du elda{" "}
                     <span className="font-semibold text-foreground">
-                      ca {Math.round(firingsForSeason)} gånger i veckan
-                    </span>{" "}
-                    — eller {num(blocksPerWeek)} klossar i veckan.
+                      ca {num(blocksPerWeekForSeason)} klossar i veckan
+                    </span>
+                    {firingsForSeason >= 1 && (
+                      <>
+                        {" "}
+                        — t.ex. {firingsForSeason} eldningar à {blocksPerFiring}{" "}
+                        klossar
+                      </>
+                    )}
+                    .
                   </>
                 )}
               </p>
             </div>
 
-            <dl className="mt-6 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-              <div className="rounded-lg bg-muted px-4 py-3">
-                <dt className="text-xs text-muted-foreground">
-                  Klossar i veckan
-                </dt>
-                <dd className="mt-0.5 text-lg font-bold">
-                  {num(blocksPerWeek)}
-                </dd>
-              </div>
-              <div className="rounded-lg bg-muted px-4 py-3">
-                <dt className="text-xs text-muted-foreground">
-                  Klossar per månad
-                </dt>
-                <dd className="mt-0.5 text-lg font-bold">
-                  {num(blocksPerMonth)}
-                </dd>
-              </div>
-              <div className="rounded-lg bg-muted px-4 py-3">
-                <dt className="text-xs text-muted-foreground">
-                  Värme per månad
-                </dt>
-                <dd className="mt-0.5 text-lg font-bold">
-                  {num(kwhPerMonth)} kWh
-                </dd>
-              </div>
-              <div className="rounded-lg bg-muted px-4 py-3">
-                <dt className="text-xs text-muted-foreground">
-                  Kostnad per månad
-                </dt>
-                <dd className="mt-0.5 text-lg font-bold">
-                  {num(costPerMonth)} kr
-                </dd>
-              </div>
-              <div className="rounded-lg bg-muted px-4 py-3">
-                <dt className="text-xs text-muted-foreground">
-                  Energi per kloss
-                </dt>
-                <dd className="mt-0.5 text-lg font-bold">
-                  {num(KWH_PER_BLOCK, 1)} kWh
-                </dd>
-              </div>
-              <div className="rounded-lg bg-muted px-4 py-3">
-                <dt className="text-xs text-muted-foreground">
-                  Värme per eldning
-                </dt>
-                <dd className="mt-0.5 text-lg font-bold">
-                  {num(kwhPerFiring)} kWh
-                </dd>
-              </div>
-            </dl>
           </div>
 
           {/* So the customer can follow the maths */}
@@ -500,7 +450,7 @@ function Index() {
               <h2 className="text-2xl font-bold">Beställ din ved</h2>
               <p className="mt-1 text-muted-foreground">
                 Fyll i dina uppgifter — vi ringer upp och bokar leverans. Vi kör
-                hem inom Stockholms län.
+                hem inom {DELIVERY_AREA.name}.
               </p>
               <form
                 className="mt-6 space-y-4"
@@ -510,7 +460,7 @@ function Index() {
                   const address = String(data.get("address") ?? "");
                   if (!isDeliveryArea(address)) {
                     setAddressError(
-                      "Vi levererar inom Stockholms län — kontrollera postnumret i adressen.",
+                      `Vi levererar inom ${DELIVERY_AREA.name} — kontrollera postnumret i adressen.`,
                     );
                     return;
                   }
@@ -584,7 +534,7 @@ function Index() {
                     placeholder="Gatuadress, postnummer och ort"
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Hemkörning ingår — leverans inom Stockholms län.
+                    Hemkörning ingår — leverans inom {DELIVERY_AREA.name}.
                   </p>
                   {addressError && (
                     <p className="mt-1 text-sm font-medium text-destructive">
@@ -595,8 +545,8 @@ function Index() {
                 <div className="rounded-lg bg-muted px-4 py-3 text-sm">
                   <span className="font-medium">Din beställning:</span>{" "}
                   {volume.toLocaleString("sv-SE")} m³ björkved —{" "}
-                  {price.toLocaleString("sv-SE")} kr inkl. hemkörning inom
-                  Stockholms län. Räcker ca {num(months, 1)} månader vid{" "}
+                  {price.toLocaleString("sv-SE")} kr inkl. hemkörning inom{" "}
+                  {DELIVERY_AREA.name}. Räcker ca {num(months, 1)} månader vid{" "}
                   {firingsPerWeek} eldningar i veckan.
                 </div>
                 {orderError && (
@@ -622,7 +572,7 @@ function Index() {
           <span className="flex items-center gap-2">
             <Flame className="h-4 w-4 text-primary" /> VedExpress
           </span>
-          <span>Torr ved · Hemkörning i Stockholms län</span>
+          <span>Torr ved · Hemkörning i {DELIVERY_AREA.name}</span>
         </div>
       </footer>
     </div>
